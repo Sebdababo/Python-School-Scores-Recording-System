@@ -2,18 +2,26 @@ import sys
 import json
 import os
 from typing import Dict, List, Optional
+from decimal import Decimal, InvalidOperation
 
 class Score:
-    def __init__(self, subject: str, value: float):
-        self.subject = subject
+    def __init__(self, subject: str, value: Decimal):
+        self.subject = subject.lower()
         self.value = value
+
+    def to_dict(self) -> Dict:
+        return {"subject": self.subject, "value": str(self.value)}
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'Score':
+        return cls(data["subject"], Decimal(data["value"]))
 
 class Student:
     def __init__(self, name: str):
         self.name = name
         self.scores: List[Score] = []
 
-    def add_score(self, subject: str, value: float) -> None:
+    def add_score(self, subject: str, value: Decimal) -> None:
         self.scores.append(Score(subject, value))
 
     def remove_score(self, index: int) -> bool:
@@ -22,26 +30,26 @@ class Student:
             return True
         return False
 
-    def get_average(self, subject: Optional[str] = None) -> float:
-        relevant_scores = [score.value for score in self.scores if subject is None or score.subject == subject]
-        return sum(relevant_scores) / len(relevant_scores) if relevant_scores else 0
+    def get_average(self, subject: Optional[str] = None) -> Decimal:
+        relevant_scores = [score.value for score in self.scores if subject is None or score.subject == subject.lower()]
+        return sum(relevant_scores) / len(relevant_scores) if relevant_scores else Decimal('0')
 
     def to_dict(self) -> Dict:
         return {
             "name": self.name,
-            "scores": [{"subject": score.subject, "value": score.value} for score in self.scores]
+            "scores": [score.to_dict() for score in self.scores]
         }
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'Student':
         student = cls(data["name"])
-        for score_data in data["scores"]:
-            student.add_score(score_data["subject"], score_data["value"])
+        student.scores = [Score.from_dict(score_data) for score_data in data["scores"]]
         return student
 
 class ScoreSystem:
     def __init__(self):
         self.students: Dict[str, Student] = {}
+        self.subjects: set = set()
         self.load_data()
 
     def add_student(self, name: str) -> None:
@@ -58,9 +66,13 @@ class ScoreSystem:
 
     def remove_student(self, name: str) -> None:
         if name in self.students:
-            del self.students[name]
-            print(f"Student {name} removed successfully.")
-            self.save_data()
+            confirmation = input(f"Are you sure you want to remove {name}? (y/n): ").lower()
+            if confirmation == 'y':
+                del self.students[name]
+                print(f"Student {name} removed successfully.")
+                self.save_data()
+            else:
+                print("Operation cancelled.")
         else:
             print(f"Error: Student {name} not found.")
 
@@ -69,14 +81,16 @@ class ScoreSystem:
             print(f"Error: Student {name} not found.")
             return
         try:
-            score_value = float(score)
-            if 0 <= score_value <= 100:
+            score_value = Decimal(score).quantize(Decimal('0.01'))
+            if Decimal('0') <= score_value <= Decimal('100'):
+                subject = subject.lower()
                 self.students[name].add_score(subject, score_value)
+                self.subjects.add(subject)
                 print(f"Score {score_value} recorded for {name} in {subject}.")
                 self.save_data()
             else:
                 print("Error: Score must be between 0 and 100.")
-        except ValueError:
+        except InvalidOperation:
             print("Error: Invalid score. Please enter a number.")
 
     def remove_score(self, name: str, index: int) -> None:
@@ -126,10 +140,13 @@ class ScoreSystem:
             print(f"Error: Student {name} not found.")
 
     def save_data(self) -> None:
-        data = {name: student.to_dict() for name, student in self.students.items()}
+        data = {
+            "students": {name: student.to_dict() for name, student in self.students.items()},
+            "subjects": list(self.subjects)
+        }
         try:
             with open("school_data.json", "w") as f:
-                json.dump(data, f)
+                json.dump(data, f, indent=2)
         except IOError:
             print("Error: Unable to save data. Please check file permissions.")
 
@@ -138,13 +155,22 @@ class ScoreSystem:
             try:
                 with open("school_data.json", "r") as f:
                     data = json.load(f)
-                self.students = {name: Student.from_dict(student_data) for name, student_data in data.items()}
+                self.students = {name: Student.from_dict(student_data) for name, student_data in data["students"].items()}
+                self.subjects = set(data.get("subjects", []))
             except (IOError, json.JSONDecodeError):
                 print("Error: Unable to load data. Starting with an empty system.")
                 self.students = {}
+                self.subjects = set()
 
 def get_input(prompt: str) -> str:
     return input(prompt).strip()
+
+def get_numeric_input(prompt: str) -> int:
+    while True:
+        try:
+            return int(input(prompt))
+        except ValueError:
+            print("Invalid input. Please enter a number.")
 
 def display_menu() -> None:
     print("\nSchool Score Recording System")
@@ -156,7 +182,8 @@ def display_menu() -> None:
     print("6. Get all students' average scores")
     print("7. List all students")
     print("8. View a student's scores")
-    print("9. Exit")
+    print("9. List all subjects")
+    print("10. Exit")
 
 def handle_choice(system: ScoreSystem, choice: int) -> None:
     if choice == 1:
@@ -173,7 +200,7 @@ def handle_choice(system: ScoreSystem, choice: int) -> None:
     elif choice == 4:
         name = get_input("Enter student name: ")
         system.view_student_scores(name)
-        index = int(get_input("Enter the index of the score to remove: ")) - 1
+        index = get_numeric_input("Enter the index of the score to remove: ") - 1
         system.remove_score(name, index)
     elif choice == 5:
         name = get_input("Enter student name: ")
@@ -188,21 +215,20 @@ def handle_choice(system: ScoreSystem, choice: int) -> None:
         name = get_input("Enter student name: ")
         system.view_student_scores(name)
     elif choice == 9:
+        print("Subjects:", ", ".join(sorted(system.subjects)) if system.subjects else "No subjects recorded yet.")
+    elif choice == 10:
         print("Thank you for using the School Score Recording System. Goodbye!")
         sys.exit(0)
     else:
-        print("Invalid choice. Please enter a number between 1 and 9.")
+        print("Invalid choice. Please enter a number between 1 and 10.")
 
 def main() -> None:
     system = ScoreSystem()
     
     while True:
         display_menu()
-        try:
-            choice = int(get_input("Enter your choice (1-9): "))
-            handle_choice(system, choice)
-        except ValueError:
-            print("Invalid input. Please enter a number.")
+        choice = get_numeric_input("Enter your choice (1-10): ")
+        handle_choice(system, choice)
 
 if __name__ == "__main__":
     main()
