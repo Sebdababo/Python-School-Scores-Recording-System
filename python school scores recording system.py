@@ -2,22 +2,23 @@ import sys
 import json
 import os
 import csv
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from decimal import Decimal, InvalidOperation
 import statistics
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
+import threading
 
 class Score:
     def __init__(self, subject: str, value: Decimal):
         self.subject = subject.lower()
         self.value = value
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         return {"subject": self.subject, "value": str(self.value)}
 
     @classmethod
-    def from_dict(cls, data: Dict) -> 'Score':
+    def from_dict(cls, data: Dict[str, Any]) -> 'Score':
         return cls(data["subject"], Decimal(data["value"]))
 
 class Student:
@@ -38,14 +39,14 @@ class Student:
         relevant_scores = [score.value for score in self.scores if subject is None or score.subject == subject.lower()]
         return sum(relevant_scores) / len(relevant_scores) if relevant_scores else Decimal('0')
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "name": self.name,
             "scores": [score.to_dict() for score in self.scores]
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> 'Student':
+    def from_dict(cls, data: Dict[str, Any]) -> 'Student':
         student = cls(data["name"])
         student.scores = [Score.from_dict(score_data) for score_data in data["scores"]]
         return student
@@ -69,6 +70,7 @@ class ScoreSystem:
         if name not in self.students:
             raise ValueError(f"Student {name} not found.")
         del self.students[name]
+        self._update_subjects()
         self.save_data()
 
     def record_score(self, name: str, subject: str, score: str) -> None:
@@ -90,6 +92,7 @@ class ScoreSystem:
             raise ValueError(f"Student {name} not found.")
         if not self.students[name].remove_score(index):
             raise ValueError("Invalid score index.")
+        self._update_subjects()
         self.save_data()
 
     def get_student_average(self, name: str, subject: Optional[str] = None) -> Decimal:
@@ -139,6 +142,9 @@ class ScoreSystem:
                 data = json.load(f)
             self.students = {name: Student.from_dict(student_data) for name, student_data in data["students"].items()}
             self.subjects = set(data.get("subjects", []))
+
+    def _update_subjects(self) -> None:
+        self.subjects = set(score.subject for student in self.students.values() for score in student.scores)
 
 class ScoreSystemGUI:
     def __init__(self, master):
@@ -247,8 +253,11 @@ class ScoreSystemGUI:
     def export_to_csv(self):
         filename = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
         if filename:
-            self.system.export_to_csv(filename)
-            messagebox.showinfo("Success", f"Data exported to {filename}")
+            try:
+                self.system.export_to_csv(filename)
+                messagebox.showinfo("Success", f"Data exported to {filename}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export data: {str(e)}")
 
     def view_statistics(self):
         subject = simpledialog.askstring("View Statistics", "Enter subject (or leave blank for overall statistics):")
@@ -263,11 +272,14 @@ class ScoreSystemGUI:
         for name in self.system.students:
             self.students_listbox.insert(tk.END, name)
 
+def run_gui():
+    root = tk.Tk()
+    app = ScoreSystemGUI(root)
+    root.mainloop()
+
 if __name__ == "__main__":
     try:
-        root = tk.Tk()
-        app = ScoreSystemGUI(root)
-        root.mainloop()
+        threading.Thread(target=run_gui, daemon=True).start()
     except Exception as e:
         print(f"An error occurred: {e}")
         sys.exit(1)
