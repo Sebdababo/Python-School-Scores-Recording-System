@@ -37,20 +37,43 @@ class ScoreSystem:
             print(f"Student {name} not found.")
 
     def get_all_averages(self):
-        for name, student in self.students.items():
-            avg = student.get_average()
-            print(f"{name}'s average score: {avg:.2f}")
+        if not self.students:
+            print("No students in the system.")
+        else:
+            for name, student in self.students.items():
+                avg = student.get_average()
+                print(f"{name}'s average score: {avg:.2f}")
 
-system = ScoreSystem()
+def main():
+    system = ScoreSystem()
+    
+    while True:
+        print("\nSchool Score Recording System")
+        print("1. Add a student")
+        print("2. Record a score")
+        print("3. Get a student's average score")
+        print("4. Get all students' average scores")
+        print("5. Exit")
+        
+        choice = input("Enter your choice (1-5): ")
+        
+        if choice == '1':
+            name = input("Enter student name: ")
+            system.add_student(name)
+        elif choice == '2':
+            name = input("Enter student name: ")
+            score = float(input("Enter score: "))
+            system.record_score(name, score)
+        elif choice == '3':
+            name = input("Enter student name: ")
+            system.get_student_average(name)
+        elif choice == '4':
+            system.get_all_averages()
+        elif choice == '5':
+            print("Thank you for using the School Score Recording System. Goodbye!")
+            break
+        else:
+            print("Invalid choice. Please try again.")
 
-system.add_student("Alice")
-system.add_student("Bob")
-system.add_student("Charlie")
-
-system.record_score("Alice", 85)
-system.record_score("Alice", 92)
-system.record_score("Bob", 78)
-system.record_score("Charlie", 95)
-
-system.get_student_average("Alice")
-system.get_all_averages()
+if __name__ == "__main__":
+    main()
