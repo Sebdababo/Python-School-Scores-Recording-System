@@ -1,4 +1,3 @@
-import sys
 import json
 import os
 import csv
@@ -7,7 +6,6 @@ from decimal import Decimal, InvalidOperation
 import statistics
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
-import threading
 
 class Score:
     def __init__(self, subject: str, value: Decimal):
@@ -272,14 +270,10 @@ class ScoreSystemGUI:
         for name in self.system.students:
             self.students_listbox.insert(tk.END, name)
 
-def run_gui():
+def main():
     root = tk.Tk()
     app = ScoreSystemGUI(root)
     root.mainloop()
 
 if __name__ == "__main__":
-    try:
-        threading.Thread(target=run_gui, daemon=True).start()
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        sys.exit(1)
+    main()
