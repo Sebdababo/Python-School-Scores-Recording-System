@@ -85,3 +85,9 @@ You can also use the CLI if you prefer. Below are some sample commands:
 ## Data Persistence
 
 The system saves all data in a JSON file (`school_data.json`) to maintain persistence between sessions. It automatically loads data on startup and saves any changes made through the GUI or CLI.
+
+## GUI Images
+
+![SSRS output 1](https://github.com/user-attachments/assets/6cfc9460-9903-4e17-8d27-e30ad9efb179)
+![SSRS output 3](https://github.com/user-attachments/assets/21ed36bf-df9a-4d04-a8e1-547c0a2e57c4)
+![SSRS output 2](https://github.com/user-attachments/assets/a8342afb-06e0-4f48-bc16-137dcdb46090)
